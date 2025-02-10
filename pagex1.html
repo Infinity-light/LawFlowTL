@@ -54,6 +54,7 @@
     padding: 12px 16px;
     border-radius: 15px;
     animation: fadeIn 0.3s ease-in;
+    white-space: pre-wrap;
   }
 
   .user-message {
@@ -109,24 +110,21 @@
     background: #1976D2;
   }
 
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-
-  /* 添加加载状态样式 */
   #send-button:disabled {
     background: #ccc;
     cursor: not-allowed;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
   }
 </style>
 </head>
 <body>
 <div id="chat-container">
   <div class="drag-area"></div>
-  
   <div id="chat-messages"></div>
-  
   <div id="input-container">
     <input type="text" id="user-input" placeholder="输入消息...">
     <button id="send-button">发送</button>
@@ -140,6 +138,9 @@
     const chatMessages = document.getElementById('chat-messages');
     const userInput = document.getElementById('user-input');
     const sendButton = document.getElementById('send-button');
+
+    // 保存聊天历史
+    let chatHistory = '';
 
     // 初始化位置
     container.style.transform = `translate(${screen.width - 420}px, 50px)`;
@@ -185,7 +186,7 @@
 
     dragArea.addEventListener('mousedown', handleMouseDown);
 
-    // 新的消息处理逻辑
+    // 添加消息到聊天界面
     const addMessage = (text, sender) => {
       const messageDiv = document.createElement('div');
       messageDiv.className = `message ${sender}-message`;
@@ -205,37 +206,33 @@
 
       // 显示用户消息
       addMessage(message, 'user');
-      userInput.value = '';
 
       try {
-        // 发送请求到后端
-        const response = await fetch('http://127.0.0.1:11434/chat', {
+        const response = await fetch('http://127.0.0.1:8080/chat', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ question: message }),
+          body: JSON.stringify({
+            message: message,
+            history: chatHistory
+          })
         });
 
         if (!response.ok) {
           throw new Error('Network response was not ok');
         }
 
-        // 读取流式响应
-        const reader = response.body.getReader();
-        let accumulatedResponse = '';
+        const data = await response.json();
 
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          // 将 Uint8Array 转换为文本
-          const chunk = new TextDecoder().decode(value);
-          accumulatedResponse += chunk;
-        }
+        // 更新聊天历史
+        chatHistory += `用户: ${message}\nAI: ${data.response}\n`;
 
         // 显示AI响应
-        addMessage(accumulatedResponse, 'ai');
+        addMessage(data.response, 'ai');
+
+        // 清空输入框
+        userInput.value = '';
       } catch (error) {
         console.error('Error:', error);
         addMessage('抱歉，发生了错误，请稍后重试。', 'ai');
